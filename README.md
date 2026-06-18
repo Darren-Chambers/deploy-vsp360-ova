@@ -77,7 +77,15 @@ be committed to version control.
 
 The survey refresh job requires the OVA file server to return a JSON
 directory listing. Nginx is recommended. If using Nginx, configure it
-with JSON autoindex:
+with JSON autoindex.
+
+OVA files must be placed in the web server's hosting directory before
+the survey refresh job is run. How files are transferred is left to the
+administrator — scp, ftp, shared storage, or any other method is
+acceptable. The survey refresh job will automatically discover all OVA
+files present in the directory at the time it runs.
+
+If using Nginx, configure it with JSON autoindex:
 
     location / {
         root /var/www/html;
@@ -176,7 +184,35 @@ survey choices up to date automatically:
 
 ---
 
-### Step 5 — Deploy VSP360
+### Step 5 — Set Survey Defaults
+
+Once the survey refresh job has run successfully the survey will be
+populated with live data. It is recommended to review and set the
+default values before the template is used for the first time.
+
+In AAP navigate to the Deploy VSP360 job template and select the
+Survey tab. For each question, click the edit icon and set the default
+value that best suits your environment. These defaults will be
+preserved by the nightly survey refresh job and will be pre-selected
+each time the deployment template is launched.
+
+Typical defaults to consider setting:
+
+| Question | Suggested default |
+|---|---|
+| VSP360 Hostname | A naming convention prefix for your environment |
+| VSP360 IP Address | First available IP in your deployment range |
+| OVA Base URL | Your OVA file server URL |
+| VSP360 Profile | small, medium, or large based on typical deployment |
+| Datastore | Your primary deployment datastore |
+| VMware Cluster | Your primary deployment cluster |
+| Resource Pool | Your primary resource pool |
+| Timezone | Your local timezone |
+| Disk Provisioning | thin is recommended for most environments |
+
+---
+
+### Step 6 — Deploy VSP360
 
 Launch the Deploy VSP360 job template. The survey will prompt for:
 
