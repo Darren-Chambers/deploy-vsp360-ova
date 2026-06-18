@@ -1,0 +1,411 @@
+---
+- name: Update AAP Job Template Survey with dynamic choices
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "./ansible_vault_vars/ansible_vault_aap.yml"
+    - "./ansible_vault_vars/ansible_vault_vcenter.yml"
+
+  vars:
+    ova_server_url: "{{ root_ova_server_url }}"
+    aap_host: "{{ aap_host_url }}"
+    aap_api_base: "{{ aap_host }}/api/controller/v2"
+    aap_job_template_id: "NONE"
+    aap_username: "{{ aap_user }}"
+    aap_password: "{{ aap_pass }}"
+
+    # Survey question variable names
+    ova_base_url_question_variable: "ova_base_url"
+    ova_question_variable: "vsp360_ova"
+    profile_question_variable: "vsp360_profile"
+    datastore_question_variable: "datastore_name"
+    cluster_question_variable: "cluster_name"
+    resource_pool_question_variable: "resource_pool"
+
+    # Default questions for new survey creation
+    default_survey_spec:
+      - question_name: "VSP360 Hostname"
+        question_description: "What should be the vsp360 hostname?"
+        variable: "vsp360_hostname"
+        type: "text"
+        required: true
+        default: "vsp360-deployment"
+        min: 0
+        max: 1024
+        choices: []
+        new_question: true
+      - question_name: "VSP360 IP Address"
+        question_description: "Enter an IP address for the vsp360 deployment"
+        variable: "vsp360_ipaddress"
+        type: "text"
+        required: true
+        default: "1.1.1.1"
+        min: 7
+        max: 15
+        choices: []
+        new_question: true
+      - question_name: "OVA Base URL"
+        question_description: "Base URL of the OVA file server"
+        variable: "ova_base_url"
+        type: "text"
+        required: true
+        default: "{{ ova_deployment_server_url }}"
+        min: 0
+        max: 1024
+        choices: []
+        new_question: true
+
+  tasks:
+
+    # -------------------------------------------------------
+    # Safety check
+    # -------------------------------------------------------
+
+    - name: Fail if job template ID has not been configured
+      ansible.builtin.fail:
+        msg: "aap_job_template_id must be set to a valid job template ID — default value 'NONE' has not been changed."
+      when: aap_job_template_id == "NONE"
+
+    # -------------------------------------------------------
+    # OVA files from Nginx
+    # -------------------------------------------------------
+
+    - name: Fetch OVA file list from Nginx
+      ansible.builtin.uri:
+        url: "{{ ova_server_url }}/"
+        method: GET
+        return_content: true
+        headers:
+          Accept: "application/json"
+      register: nginx_index
+
+    - name: Parse OVA filenames from Nginx index
+      ansible.builtin.set_fact:
+        ova_filenames: >-
+          {{
+            nginx_index.json
+            | selectattr('type', 'equalto', 'file')
+            | selectattr('name', 'match', '.+\.ova$')
+            | map(attribute='name')
+            | map('trim')
+            | list
+          }}
+
+    - name: Fail early if no OVA files found
+      ansible.builtin.fail:
+        msg: "No OVA files found at {{ ova_server_url }} — aborting to avoid wiping survey choices."
+      when: ova_filenames | length == 0
+
+    # -------------------------------------------------------
+    # vCenter — Datastores
+    # -------------------------------------------------------
+
+    - name: Fetch datastores from vCenter
+      community.vmware.vmware_datastore_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        datacenter: "{{ vcenter_datacenter }}"
+      delegate_to: localhost
+      register: datastore_info
+
+    - name: Parse datastore names
+      ansible.builtin.set_fact:
+        datastore_names: >-
+          {{
+            datastore_info.datastores
+            | map(attribute='name')
+            | sort
+            | list
+          }}
+
+    - name: Fail early if no datastores found
+      ansible.builtin.fail:
+        msg: "No datastores found in vCenter datacenter {{ vcenter_datacenter }}."
+      when: datastore_names | length == 0
+
+    # -------------------------------------------------------
+    # vCenter — Clusters
+    # -------------------------------------------------------
+
+    - name: Fetch clusters from vCenter
+      community.vmware.vmware_cluster_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        datacenter: "{{ vcenter_datacenter }}"
+      delegate_to: localhost
+      register: cluster_info
+
+    - name: Parse cluster names
+      ansible.builtin.set_fact:
+        cluster_names: >-
+          {{
+            cluster_info.clusters
+            | dict2items
+            | map(attribute='key')
+            | sort
+            | list
+          }}
+
+    - name: Fail early if no clusters found
+      ansible.builtin.fail:
+        msg: "No clusters found in vCenter datacenter {{ vcenter_datacenter }}."
+      when: cluster_names | length == 0
+
+    # -------------------------------------------------------
+    # vCenter — Resource Pools
+    # -------------------------------------------------------
+
+    - name: Fetch resource pools from vCenter
+      community.vmware.vmware_resource_pool_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+      delegate_to: localhost
+      register: resource_pool_info
+
+    - name: Parse resource pool names
+      ansible.builtin.set_fact:
+        resource_pool_names: >-
+          {{
+            resource_pool_info.resource_pool_info
+            | map(attribute='name')
+            | reject('equalto', 'Resources')
+            | sort
+            | list
+          }}
+
+    - name: Fail early if no resource pools found
+      ansible.builtin.fail:
+        msg: "No resource pools found in vCenter."
+      when: resource_pool_names | length == 0
+
+    # -------------------------------------------------------
+    # Fetch existing AAP survey
+    # -------------------------------------------------------
+
+    - name: Fetch existing survey spec from AAP
+      ansible.builtin.uri:
+        url: "{{ aap_api_base }}/job_templates/{{ aap_job_template_id }}/survey_spec/"
+        method: GET
+        user: "{{ aap_username }}"
+        password: "{{ aap_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: [200, 404]
+      register: existing_survey
+
+    - name: Set survey spec — use existing or initialise with defaults
+      ansible.builtin.set_fact:
+        existing_survey_spec: >-
+          {{
+            existing_survey.json.spec
+            if existing_survey.status == 200
+            and existing_survey.json.spec is defined
+            and existing_survey.json.spec | length > 0
+            else default_survey_spec
+          }}
+        survey_is_new: >-
+          {{
+            existing_survey.status == 404
+            or existing_survey.json.spec is not defined
+            or existing_survey.json.spec | length == 0
+          }}
+
+    - name: Build existing defaults lookup
+      ansible.builtin.set_fact:
+        existing_defaults: >-
+          {{
+            existing_survey_spec
+            | items2dict(key_name='variable', value_name='default')
+            if existing_survey_spec | length > 0
+            else {}
+          }}
+
+    - name: "DEBUG | Survey initialisation status"
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            'No existing survey found — initialising with default questions (vsp360_hostname, vsp360_ipaddress, ova_base_url)'
+            if survey_is_new
+            else 'Existing survey found with ' + (existing_survey_spec | length | string) + ' question(s) — merging updates'
+          }}
+
+    # -------------------------------------------------------
+    # Build survey questions
+    # -------------------------------------------------------
+
+    - name: Build OVA base URL question
+      ansible.builtin.set_fact:
+        ova_base_url_question:
+          question_name: "OVA Base URL"
+          question_description: "Base URL of the OVA file server"
+          variable: "{{ ova_base_url_question_variable }}"
+          type: "text"
+          choices: []
+          required: true
+          default: "{{ existing_defaults[ova_base_url_question_variable] | default(ova_server_url) }}"
+          min: 0
+          max: 1024
+          new_question: >-
+            {{
+              existing_survey_spec
+              | selectattr('variable', 'equalto', ova_base_url_question_variable)
+              | list
+              | length == 0
+            }}
+
+    - name: Build OVA question
+      ansible.builtin.set_fact:
+        ova_question:
+          question_name: "VSP360 .ova"
+          question_description: "Specify the OVA filename from {{ ova_server_url }}"
+          variable: "{{ ova_question_variable }}"
+          type: "multiplechoice"
+          choices: "{{ ova_filenames }}"
+          required: false
+          default: "{{ existing_defaults[ova_question_variable] | default(ova_filenames | first) }}"
+          min: 0
+          max: 1024
+          new_question: >-
+            {{
+              existing_survey_spec
+              | selectattr('variable', 'equalto', ova_question_variable)
+              | list
+              | length == 0
+            }}
+
+    - name: Build profile question
+      ansible.builtin.set_fact:
+        profile_question:
+          question_name: "VSP360 Profile"
+          question_description: "Select the deployment profile size"
+          variable: "{{ profile_question_variable }}"
+          type: "multiplechoice"
+          choices:
+            - "small"
+            - "medium"
+            - "large"
+          required: true
+          default: "{{ existing_defaults[profile_question_variable] | default('small') }}"
+          min: 0
+          max: 1024
+          new_question: >-
+            {{
+              existing_survey_spec
+              | selectattr('variable', 'equalto', profile_question_variable)
+              | list
+              | length == 0
+            }}
+
+    - name: Build datastore question
+      ansible.builtin.set_fact:
+        datastore_question:
+          question_name: "Datastore"
+          question_description: "Select the target datastore"
+          variable: "{{ datastore_question_variable }}"
+          type: "multiplechoice"
+          choices: "{{ datastore_names }}"
+          required: true
+          default: "{{ existing_defaults[datastore_question_variable] | default(datastore_names | first) }}"
+          min: 0
+          max: 1024
+          new_question: >-
+            {{
+              existing_survey_spec
+              | selectattr('variable', 'equalto', datastore_question_variable)
+              | list
+              | length == 0
+            }}
+
+    - name: Build cluster question
+      ansible.builtin.set_fact:
+        cluster_question:
+          question_name: "Cluster"
+          question_description: "Select the target cluster"
+          variable: "{{ cluster_question_variable }}"
+          type: "multiplechoice"
+          choices: "{{ cluster_names }}"
+          required: true
+          default: "{{ existing_defaults[cluster_question_variable] | default(cluster_names | first) }}"
+          min: 0
+          max: 1024
+          new_question: >-
+            {{
+              existing_survey_spec
+              | selectattr('variable', 'equalto', cluster_question_variable)
+              | list
+              | length == 0
+            }}
+
+    - name: Build resource pool question
+      ansible.builtin.set_fact:
+        resource_pool_question:
+          question_name: "Resource Pool"
+          question_description: "Select the target resource pool"
+          variable: "{{ resource_pool_question_variable }}"
+          type: "multiplechoice"
+          choices: "{{ resource_pool_names }}"
+          required: true
+          default: "{{ existing_defaults[resource_pool_question_variable] | default(resource_pool_names | first) }}"
+          min: 0
+          max: 1024
+          new_question: >-
+            {{
+              existing_survey_spec
+              | selectattr('variable', 'equalto', resource_pool_question_variable)
+              | list
+              | length == 0
+            }}
+
+    # -------------------------------------------------------
+    # Merge and POST
+    # -------------------------------------------------------
+
+    - name: Merge all dynamic questions into survey spec
+      ansible.builtin.set_fact:
+        merged_spec: >-
+          {{
+            existing_survey_spec
+            | rejectattr('variable', 'equalto', ova_base_url_question_variable)
+            | rejectattr('variable', 'equalto', ova_question_variable)
+            | rejectattr('variable', 'equalto', profile_question_variable)
+            | rejectattr('variable', 'equalto', datastore_question_variable)
+            | rejectattr('variable', 'equalto', cluster_question_variable)
+            | rejectattr('variable', 'equalto', resource_pool_question_variable)
+            | list
+            + [ova_base_url_question, ova_question, profile_question, datastore_question, cluster_question, resource_pool_question]
+          }}
+
+    - name: POST merged survey spec back to AAP
+      ansible.builtin.uri:
+        url: "{{ aap_api_base }}/job_templates/{{ aap_job_template_id }}/survey_spec/"
+        method: POST
+        user: "{{ aap_username }}"
+        password: "{{ aap_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: "{{ existing_survey.json.name | default('VSP360 Deployment Survey') }}"
+          description: "{{ existing_survey.json.description | default('Auto-generated survey for VSP360 deployment') }}"
+          spec: "{{ merged_spec }}"
+        status_code: 200
+
+    - name: Ensure survey is enabled on the job template
+      ansible.builtin.uri:
+        url: "{{ aap_api_base }}/job_templates/{{ aap_job_template_id }}/"
+        method: PATCH
+        user: "{{ aap_username }}"
+        password: "{{ aap_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          survey_enabled: true
+        status_code: 200

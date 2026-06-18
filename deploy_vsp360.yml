@@ -1,0 +1,157 @@
+---
+##################################################
+# Deploy VSP360 OVA to VMware vCenter
+# Supports: small, medium, large profiles
+##################################################
+
+- name: Deploy VSP360 OVA to VMware vCenter
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "./ansible_vault_vars/ansible_vault_vcenter.yml"
+
+  vars:
+    vm_name: "{{ vsp360_hostname }}"
+    network_mapping:
+      "VM Network": "VM Network"
+
+    # Profile sizing map
+    profile_config:
+      small:
+        data_disk_gb: null
+        num_vcpu: null
+        mem_size_mb: null
+        resize_required: false
+      medium:
+        data_disk_gb: 535
+        num_vcpu: 15
+        mem_size_mb: 47100
+        resize_required: true
+      large:
+        data_disk_gb: 735
+        num_vcpu: 18
+        mem_size_mb: 58368
+        resize_required: true
+
+    # Resolved profile settings
+    selected_profile: "{{ profile_config[vsp360_profile] }}"
+
+  tasks:
+
+    - name: Validate profile selection
+      ansible.builtin.fail:
+        msg: "Invalid profile '{{ vsp360_profile }}'. Must be one of: small, medium, large."
+      when: vsp360_profile not in ['small', 'medium', 'large']
+
+    - name: Deploy OVF/OVA to vSphere
+      community.vmware.vmware_deploy_ovf:
+        allow_duplicates: false
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        datacenter: "{{ vcenter_datacenter }}"
+        cluster: "{{ cluster_name }}"
+        datastore: "{{ datastore_name }}"
+        disk_provisioning: thin
+        resource_pool: "{{ resource_pool }}"
+        name: "{{ vm_name }}"
+        url: "{{ ova_base_url }}/{{ vsp360_ova }}"
+        networks: "{{ network_mapping }}"
+        power_on: false
+        wait_for_ip_address: false
+        properties:
+          guestinfo.username: admin
+          guestinfo.userpassword: "{{ vsp360_root_password }}"
+          guestinfo.hostname: "{{ vsp360_hostname }}"
+          guestinfo.ipaddress: "{{ vsp360_ipaddress }}"
+          guestinfo.netmask: "{{ vsp360_netmask }}"
+          guestinfo.gateway: "{{ vsp360_gateway }}"
+          guestinfo.dns: "{{ vsp360_dns }}"
+          guestinfo.domain: "{{ vsp360_domain }}"
+          guestinfo.ntp: "{{ vsp360_ntp }}"
+          guestinfo.timezone: "{{ vsp360_timezone }}"
+      delegate_to: localhost
+
+    - name: Expand Hard Disk 2
+      community.vmware.vmware_guest_disk:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        datacenter: "{{ vcenter_datacenter }}"
+        name: "{{ vm_name }}"
+        disk:
+          - size_gb: "{{ selected_profile.data_disk_gb }}"
+            unit_number: 1
+            scsi_controller: 0
+            state: present
+      delegate_to: localhost
+      when: selected_profile.resize_required
+
+    - name: Set vCPUs and Memory
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        datacenter: "{{ vcenter_datacenter }}"
+        name: "{{ vm_name }}"
+        hardware:
+          num_cpus: "{{ selected_profile.num_vcpu }}"
+          num_cpu_cores_per_socket: 1
+          memory_mb: "{{ selected_profile.mem_size_mb }}"
+        state: present
+      delegate_to: localhost
+      when: selected_profile.resize_required
+
+    - name: Power on VM
+      community.vmware.vmware_guest_powerstate:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        datacenter: "{{ vcenter_datacenter }}"
+        name: "{{ vm_name }}"
+        state: powered-on
+      delegate_to: localhost
+
+    - name: Wait for VMware Tools and IP address
+      community.vmware.vmware_guest_tools_wait:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        datacenter: "{{ vcenter_datacenter }}"
+        name: "{{ vm_name }}"
+        timeout: 600
+      delegate_to: localhost
+      register: vm_facts
+
+    - name: Configure VSP360 profile via API
+      ansible.builtin.uri:
+        url: "http://{{ vsp360_ipaddress }}:8080/platform/install"
+        method: PUT
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          installType: "single"
+          profile: "{{ vsp360_profile }}"
+        return_content: true
+      register: put_result
+
+    - name: Wait for installation to complete
+      ansible.builtin.uri:
+        url: "http://{{ vsp360_ipaddress }}:8080/platform/install/status"
+        method: GET
+        return_content: true
+      register: get_result
+      until: get_result.json.success == true
+      retries: 30
+      delay: 60
+
+    - name: Show final status
+      ansible.builtin.debug:
+        var: get_result.json
