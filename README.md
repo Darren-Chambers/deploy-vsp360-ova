@@ -34,10 +34,19 @@ and resource pools each evening via a scheduled job.
 
 ## First Time Setup
 
-### 1. Clone the repository
+### 1. Create the AAP Project
 
-    git clone <your-repo-url>
-    cd deploy_vsp360
+In AAP navigate to Projects and create a new project with the
+following settings:
+
+| Setting | Value |
+|---|---|
+| Name | deploy_vsp360 |
+| Source Control Type | Git |
+| Source Control URL | <paste your git repository URL here> |
+
+AAP will automatically clone the repository when the project is saved
+and on every subsequent sync.
 
 ### 2. Create site configuration
 
@@ -109,10 +118,13 @@ Create a job template in AAP with the following settings:
 Note the Job Template ID from the URL once created — you will need it
 in Step 2.
 
-Navigate to the template and check the URL:
-https://<aap-host>/#/templates/job_template/58/details
-                                              ^^
-                                        that is your ID
+In AAP navigate to the template, then check your browser address bar.
+The URL will look similar to this:
+
+    https://<aap-host>/execution/templates/job-template/70/details
+
+In this example 70 is the Job Template ID. Make a note of your ID
+before proceeding to Step 2.
 
 ---
 
