@@ -36,6 +36,72 @@ and resource pools each evening via a scheduled job.
 
 ---
 
+## How It Works
+
+### Overview
+
+The project consists of two Ansible playbooks that work together to
+provide a fully automated VSP360 deployment experience in AAP.
+
+### deploy_vsp360.yml
+
+This is the main deployment playbook. It takes inputs from an AAP
+survey and uses them to deploy a VSP360 OVA to VMware vCenter. The
+survey presents the operator with a set of questions — such as hostname,
+IP address, OVA file, profile size, and VMware target — and uses the
+answers to drive the deployment.
+
+Once the OVA is deployed the playbook resizes the VM hardware if
+required by the selected profile, powers it on, waits for VMware Tools
+to become available, and then configures the VSP360 application via
+its REST API.
+
+### update_aap_survey.yml — Why it exists
+
+AAP surveys are static by nature — the choices in a dropdown are fixed
+at the time the survey is created and do not update automatically. This
+means that if a new OVA file is added to the file server, or a new
+datastore is added to vCenter, the survey dropdown would not show it
+until someone manually updated it.
+
+The update_aap_survey.yml playbook solves this by acting as a survey
+manager. Each time it runs it:
+
+- Connects to the OVA file server and retrieves the current list of
+  available OVA files
+- Connects to vCenter and retrieves the current list of datastores,
+  clusters, resource pools and networks
+- Updates the dropdown choices in the AAP survey with the live data
+- Preserves any defaults the operator has previously set
+- Creates the survey from scratch if it does not yet exist
+
+This playbook is scheduled to run every evening so that by the time
+an operator launches the deploy template the next morning, the survey
+choices are always current and accurate.
+
+### Workflow
+
+The typical workflow is:
+
+    1. update_aap_survey.yml runs on schedule each evening
+                |
+                v
+    2. Survey choices updated with live OVA files and vCenter objects
+                |
+                v
+    3. Operator launches Ansible Deploy VSP360 job template
+                |
+                v
+    4. Survey presented with current choices and saved defaults
+                |
+                v
+    5. deploy_vsp360.yml runs with operator selections
+                |
+                v
+    6. VSP360 deployed, configured and ready to use
+
+---
+
 ## First Time Setup
 
 ### 1. Create the AAP Project
