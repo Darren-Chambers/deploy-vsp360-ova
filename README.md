@@ -26,7 +26,8 @@ and resource pools each evening via a scheduled job.
 - Red Hat Ansible Automation Platform 2.5+
 - VMware vCenter access
 - community.vmware collection available in your AAP execution environment
-- Nginx web server hosting OVA files with autoindex_format json enabled
+- A web server hosting OVA files capable of serving a JSON directory index.
+  Nginx is recommended using autoindex_format json (see Step 4).
 - Git repository connected to AAP as a project
 
 ---
@@ -63,9 +64,11 @@ Store the vault password in AAP as a Vault Credential — it will be
 used automatically when jobs run. The encrypted vault file must not
 be committed to version control.
 
-### 4. Configure Nginx autoindex
+### 4. Configure web server directory index
 
-On your OVA file server, ensure Nginx is configured with JSON autoindex:
+The survey refresh job requires the OVA file server to return a JSON
+directory listing. Nginx is recommended. If using Nginx, configure it
+with JSON autoindex:
 
     location / {
         root /var/www/html;
@@ -139,7 +142,7 @@ be set before the job will run successfully.
 Run the Refresh VSP360 Survey job template manually for the first time.
 This will:
 
-- Connect to Nginx and discover available OVA files
+- Connect to the OVA file server and discover available OVA files
 - Connect to vCenter and discover datastores, clusters, and resource pools
 - Create the survey on the Deploy VSP360 template if it does not exist
 - Populate all dropdown choices with live data
@@ -201,7 +204,7 @@ Copied from vars/site_config.yml.example — not committed to Git.
 | aap_host | update_aap_survey.yml | AAP server URL |
 | vcenter_hostname | both | vCenter server IP or hostname |
 | vcenter_datacenter | both | vCenter datacenter name |
-| ova_server_url | both | Nginx OVA file server base URL |
+| ova_server_url | both | OVA file server base URL |
 | vsp360_default_ip | update_aap_survey.yml | Default IP shown in survey |
 | vsp360_netmask | deploy_vsp360.yml | VM network mask |
 | vsp360_gateway | deploy_vsp360.yml | VM default gateway |
