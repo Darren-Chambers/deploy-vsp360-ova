@@ -16,8 +16,10 @@ and resource pools each evening via a scheduled job.
     ├── update_aap_survey.yml          # Refreshes AAP survey with live data
     ├── ansible_vault_vars/
     │   └── ansible_vault.yml.example  # Copy to ansible_vault.yml and populate
-    └── vars/
-        └── site_config.yml.example    # Copy to site_config.yml and populate
+    ├── vars/
+    │   └── site_config.yml.example    # Copy to site_config.yml and populate
+    └── images/
+        └── Ansible_VSP360_Deploy.png  # AAP job template creation screenshot
 
 ---
 
@@ -109,7 +111,69 @@ Expected output:
 
 ---
 
-## AAP Setup
+## Simple Setup (Manual Survey)
+
+If you do not require automatic survey refresh from vCenter and the OVA
+file server, the deploy_vsp360.yml playbook can be used standalone with
+a manually configured survey in AAP. This removes the requirement for
+the Refresh VSP360 Survey job template and the nightly schedule.
+
+### Step 1 — Create the Deploy Job Template
+
+Follow Step 1 from the AAP Setup section below.
+
+### Step 2 — Create the survey manually
+
+In AAP navigate to the Deploy VSP360 job template and select the
+Survey tab. Add the following questions manually:
+
+| Question | Variable | Type | Required |
+|---|---|---|---|
+| VSP360 Hostname | vsp360_hostname | Text | Yes |
+| VSP360 IP Address | vsp360_ipaddress | Text | Yes |
+| OVA Base URL | ova_base_url | Text | Yes |
+| VSP360 .ova | vsp360_ova | Multiple Choice | No |
+| VSP360 Profile | vsp360_profile | Multiple Choice | Yes |
+| Datastore | datastore_name | Multiple Choice | Yes |
+| VMware Cluster | cluster_name | Multiple Choice | Yes |
+| Resource Pool | resource_pool | Multiple Choice | Yes |
+| VM Network | vsp360_network | Multiple Choice | Yes |
+| Timezone | vsp360_timezone | Multiple Choice | Yes |
+| Disk Provisioning | disk_provisioning | Multiple Choice | Yes |
+
+For Multiple Choice questions, enter the choices manually based on
+your environment. The VSP360 Profile and Disk Provisioning choices
+are fixed:
+
+VSP360 Profile choices:
+
+    small
+    medium
+    large
+
+Disk Provisioning choices:
+
+    thin
+    thick
+    eagerzeroedthick
+    monolithicSparse
+    monolithicFlat
+
+### Step 3 — Deploy VSP360
+
+Launch the Deploy VSP360 job template and complete the survey with
+your environment values.
+
+### Limitations of manual survey
+
+- OVA file choices must be updated manually when new OVA files are added
+- VMware choices (datastores, clusters, resource pools, networks) must
+  be updated manually when your vCenter environment changes
+- No nightly refresh means choices may become stale over time
+
+---
+
+## AAP Setup (Dynamic Survey)
 
 ### Step 1 — Create the Deploy Job Template
 
@@ -122,6 +186,8 @@ Create a job template in AAP with the following settings:
 | Credentials | Your Vault Credential |
 | Inventory | localhost |
 | Survey | Enabled (populated by the refresh job) |
+
+![Deploy VSP360 Job Template creation screen](images/Ansible_VSP360_Deploy.png)
 
 Note the Job Template ID from the URL once created — you will need it
 in Step 2.
@@ -163,7 +229,8 @@ Run the Refresh VSP360 Survey job template manually for the first time.
 This will:
 
 - Connect to the OVA file server and discover available OVA files
-- Connect to vCenter and discover datastores, clusters, and resource pools
+- Connect to vCenter and discover datastores, clusters, resource pools
+  and networks
 - Create the survey on the Deploy VSP360 template if it does not exist
 - Populate all dropdown choices with live data
 - Preserve any existing defaults
@@ -207,6 +274,7 @@ Typical defaults to consider setting:
 | Datastore | Your primary deployment datastore |
 | VMware Cluster | Your primary deployment cluster |
 | Resource Pool | Your primary resource pool |
+| VM Network | Your primary VM network |
 | Timezone | Your local timezone |
 | Disk Provisioning | thin is recommended for most environments |
 
@@ -226,6 +294,7 @@ Launch the Deploy VSP360 job template. The survey will prompt for:
 | Datastore | Select from available vCenter datastores |
 | VMware Cluster | Select from available vCenter clusters |
 | Resource Pool | Select from available vCenter resource pools |
+| VM Network | Select from available vCenter networks |
 | Timezone | Select the VM timezone |
 | Disk Provisioning | Select the disk provisioning type |
 
@@ -286,3 +355,16 @@ Copied from ansible_vault_vars/ansible_vault.yml.example — not committed to Gi
   one automatically with sensible defaults.
 - The refresh job will abort safely if no OVA files or vCenter objects
   are found, preventing the survey from being wiped.
+
+---
+
+## License
+
+Copyright 2024 Hitachi Vantara
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE)
+for the full license text.
+
+This software is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND. The authors accept no liability for any damages
+arising from the use of this software. Use at your own risk.
