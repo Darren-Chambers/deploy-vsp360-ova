@@ -49,7 +49,7 @@
             variable: "vsp360_hostname"
             type: "text"
             required: true
-            default: "vsp360-large"
+            default: "vsp360-small"
             min: 0
             max: 1024
             choices: []
