@@ -16,16 +16,16 @@
 # -------------------------------------------------------
 # AAP credentials
 # -------------------------------------------------------
-aap_user: "your-aap-username"
+aap_user: "admin"
 aap_pass: "your-aap-password"
 
 # -------------------------------------------------------
 # vCenter credentials
 # -------------------------------------------------------
-vcenter_username: "your-username"
-vcenter_password: "your-password"
+vcenter_username: "administrator@vsphere.local"
+vcenter_password: "your-vcenter-password"
 
 # -------------------------------------------------------
 # VSP360 credentials
 # -------------------------------------------------------
-vsp360_root_password: "your-password"
+vsp360_root_password: "your-vsp360-root-password"
