@@ -118,7 +118,8 @@ Expected output:
 If you do not require automatic survey refresh from vCenter and the OVA
 file server, the deploy_vsp360.yml playbook can be used standalone with
 a manually configured survey in AAP. This removes the requirement for
-the Refresh VSP360 Survey job template and the nightly schedule.
+the Ansible Deploy VSP360 Survey Refresh job template and the nightly
+schedule.
 
 ### Step 1 — Create the Deploy Job Template
 
@@ -126,8 +127,8 @@ Follow Step 1 from the AAP Setup section below.
 
 ### Step 2 — Create the survey manually
 
-In AAP navigate to the Deploy VSP360 job template and select the
-Survey tab. Add the following questions manually:
+In AAP navigate to the Ansible Deploy VSP360 job template and select
+the Survey tab. Add the following questions manually:
 
 | Question | Variable | Type | Required |
 |---|---|---|---|
@@ -163,8 +164,8 @@ Disk Provisioning choices:
 
 ### Step 3 — Deploy VSP360
 
-Launch the Deploy VSP360 job template and complete the survey with
-your environment values.
+Launch the Ansible Deploy VSP360 job template and complete the survey
+with your environment values.
 
 ### Limitations of manual survey
 
@@ -183,13 +184,13 @@ Create a job template in AAP with the following settings:
 
 | Setting | Value |
 |---|---|
-| Name | Deploy VSP360 |
+| Name | Ansible Deploy VSP360 |
 | Playbook | deploy_vsp360.yml |
 | Credentials | Your Vault Credential |
 | Inventory | localhost |
 | Survey | Enabled (populated by the refresh job) |
 
-![Deploy VSP360 Job Template creation screen](images/Ansible_VSP360_Deploy.png)
+![Ansible Deploy VSP360 Job Template creation screen](images/Ansible_VSP360_Deploy.png)
 
 Note the Job Template ID from the URL once created — you will need it
 in Step 2.
@@ -210,12 +211,12 @@ Create a second job template with the following settings:
 
 | Setting | Value |
 |---|---|
-| Name | Refresh VSP360 Survey |
+| Name | Ansible Deploy VSP360 Survey Refresh |
 | Playbook | update_aap_survey.yml |
 | Credentials | Your Vault Credential |
 | Inventory | localhost |
 
-![Refresh VSP360 Survey Job Template creation screen](images/Ansible_VSP360_Refresh_Survey.png)
+![Ansible Deploy VSP360 Survey Refresh Job Template creation screen](images/Ansible_VSP360_Refresh_Survey.png)
 
 Add the following Extra Variable, replacing <template_id> with the
 ID noted from Step 1:
@@ -229,13 +230,14 @@ be set before the job will run successfully.
 
 ### Step 3 — Run the Survey Refresh Job
 
-Run the Refresh VSP360 Survey job template manually for the first time.
-This will:
+Run the Ansible Deploy VSP360 Survey Refresh job template manually
+for the first time. This will:
 
 - Connect to the OVA file server and discover available OVA files
 - Connect to vCenter and discover datastores, clusters, resource pools
   and networks
-- Create the survey on the Deploy VSP360 template if it does not exist
+- Create the survey on the Ansible Deploy VSP360 template if it does
+  not exist
 - Populate all dropdown choices with live data
 - Preserve any existing defaults
 
@@ -243,8 +245,8 @@ This will:
 
 ### Step 4 — Schedule the Survey Refresh Job
 
-Add a schedule to the Refresh VSP360 Survey job template to keep the
-survey choices up to date automatically:
+Add a schedule to the Ansible Deploy VSP360 Survey Refresh job template
+to keep the survey choices up to date automatically:
 
 | Setting | Value |
 |---|---|
@@ -261,9 +263,9 @@ Once the survey refresh job has run successfully the survey will be
 populated with live data. It is recommended to review and set the
 default values before the template is used for the first time.
 
-In AAP navigate to the Deploy VSP360 job template and select the
-Survey tab. For each question, click the edit icon and set the default
-value that best suits your environment. These defaults will be
+In AAP navigate to the Ansible Deploy VSP360 job template and select
+the Survey tab. For each question, click the edit icon and set the
+default value that best suits your environment. These defaults will be
 preserved by the nightly survey refresh job and will be pre-selected
 each time the deployment template is launched.
 
@@ -288,7 +290,8 @@ Typical defaults to consider setting:
 
 ### Step 6 — Deploy VSP360
 
-Launch the Deploy VSP360 job template. The survey will prompt for:
+Launch the Ansible Deploy VSP360 job template. The survey will prompt
+for:
 
 | Question | Description |
 |---|---|
@@ -357,8 +360,8 @@ Copied from ansible_vault_vars/ansible_vault.yml.example — not committed to Gi
 - Neither file should ever be committed to version control.
 - The survey refresh job safely preserves existing survey defaults and
   all non-dynamic questions on every run.
-- If no survey exists on the deploy template, the refresh job will create
-  one automatically with sensible defaults.
+- If no survey exists on the Ansible Deploy VSP360 template, the refresh
+  job will create one automatically with sensible defaults.
 - The refresh job will abort safely if no OVA files or vCenter objects
   are found, preventing the survey from being wiped.
 
