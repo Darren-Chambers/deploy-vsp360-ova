@@ -4,13 +4,9 @@
   gather_facts: false
 
   vars_files:
-    - "./ansible_vault_vars/ansible_vault_aap.yml"
-    - "./ansible_vault_vars/ansible_vault_vcenter.yml"
+    - "./ansible_vault_vars/ansible_vault.yml"
 
   vars:
-    ova_server_url: "{{ root_ova_server_url }}"
-    aap_host: "{{ aap_host_url }}"
-    aap_api_base: "{{ aap_host }}/api/controller/v2"
     aap_job_template_id: "NONE"
     aap_username: "{{ aap_user }}"
     aap_password: "{{ aap_pass }}"
@@ -22,41 +18,62 @@
     datastore_question_variable: "datastore_name"
     cluster_question_variable: "cluster_name"
     resource_pool_question_variable: "resource_pool"
-
-    # Default questions for new survey creation
-    default_survey_spec:
-      - question_name: "VSP360 Hostname"
-        question_description: "What should be the vsp360 hostname?"
-        variable: "vsp360_hostname"
-        type: "text"
-        required: true
-        default: "vsp360-deployment"
-        min: 0
-        max: 1024
-        choices: []
-        new_question: true
-      - question_name: "VSP360 IP Address"
-        question_description: "Enter an IP address for the vsp360 deployment"
-        variable: "vsp360_ipaddress"
-        type: "text"
-        required: true
-        default: "1.1.1.1"
-        min: 7
-        max: 15
-        choices: []
-        new_question: true
-      - question_name: "OVA Base URL"
-        question_description: "Base URL of the OVA file server"
-        variable: "ova_base_url"
-        type: "text"
-        required: true
-        default: "{{ ova_deployment_server_url }}"
-        min: 0
-        max: 1024
-        choices: []
-        new_question: true
+    timezone_question_variable: "vsp360_timezone"
+    disk_provisioning_question_variable: "disk_provisioning"
 
   tasks:
+
+    # -------------------------------------------------------
+    # Site vars
+    # -------------------------------------------------------
+
+    - name: Check if site vars file exists
+      ansible.builtin.stat:
+        path: "./vars/site_config.yml"
+      register: site_config_stat
+
+    - name: Include site vars file if present
+      ansible.builtin.include_vars:
+        file: "./vars/site_config.yml"
+      when: site_config_stat.stat.exists
+
+    - name: Set AAP API base URL
+      ansible.builtin.set_fact:
+        aap_api_base: "{{ aap_host }}/api/controller/v2"
+
+    - name: Set default survey spec
+      ansible.builtin.set_fact:
+        default_survey_spec:
+          - question_name: "VSP360 Hostname"
+            question_description: "What should be the vsp360 hostname?"
+            variable: "vsp360_hostname"
+            type: "text"
+            required: true
+            default: "vsp360-large"
+            min: 0
+            max: 1024
+            choices: []
+            new_question: true
+          - question_name: "VSP360 IP Address"
+            question_description: "Enter an IP address for the vsp360 deployment"
+            variable: "vsp360_ipaddress"
+            type: "text"
+            required: true
+            default: "{{ vsp360_default_ip }}"
+            min: 7
+            max: 15
+            choices: []
+            new_question: true
+          - question_name: "OVA Base URL"
+            question_description: "Base URL of the OVA file server"
+            variable: "ova_base_url"
+            type: "text"
+            required: true
+            default: "{{ ova_server_url }}"
+            min: 0
+            max: 1024
+            choices: []
+            new_question: true
 
     # -------------------------------------------------------
     # Safety check
@@ -326,8 +343,8 @@
     - name: Build cluster question
       ansible.builtin.set_fact:
         cluster_question:
-          question_name: "Cluster"
-          question_description: "Select the target cluster"
+          question_name: "VMware Cluster"
+          question_description: "Select the target VMware cluster"
           variable: "{{ cluster_question_variable }}"
           type: "multiplechoice"
           choices: "{{ cluster_names }}"
@@ -363,6 +380,69 @@
               | length == 0
             }}
 
+    - name: Build timezone question
+      ansible.builtin.set_fact:
+        timezone_question:
+          question_name: "Timezone"
+          question_description: "Select the VSP360 timezone"
+          variable: "{{ timezone_question_variable }}"
+          type: "multiplechoice"
+          choices:
+            - "Europe/Amsterdam"
+            - "Europe/Berlin"
+            - "Europe/London"
+            - "Europe/Madrid"
+            - "Europe/Paris"
+            - "Europe/Rome"
+            - "Europe/Stockholm"
+            - "Asia/Colombo"
+            - "Asia/Dubai"
+            - "Asia/Kolkata"
+            - "Asia/Singapore"
+            - "Asia/Tokyo"
+            - "America/Chicago"
+            - "America/Denver"
+            - "America/Los_Angeles"
+            - "America/New_York"
+            - "Australia/Sydney"
+            - "UTC"
+          required: true
+          default: "{{ existing_defaults[timezone_question_variable] | default('Europe/Amsterdam') }}"
+          min: 0
+          max: 1024
+          new_question: >-
+            {{
+              existing_survey_spec
+              | selectattr('variable', 'equalto', timezone_question_variable)
+              | list
+              | length == 0
+            }}
+
+    - name: Build disk provisioning question
+      ansible.builtin.set_fact:
+        disk_provisioning_question:
+          question_name: "Disk Provisioning"
+          question_description: "Select the disk provisioning type"
+          variable: "{{ disk_provisioning_question_variable }}"
+          type: "multiplechoice"
+          choices:
+            - "thin"
+            - "thick"
+            - "eagerzeroedthick"
+            - "monolithicSparse"
+            - "monolithicFlat"
+          required: true
+          default: "{{ existing_defaults[disk_provisioning_question_variable] | default('thin') }}"
+          min: 0
+          max: 1024
+          new_question: >-
+            {{
+              existing_survey_spec
+              | selectattr('variable', 'equalto', disk_provisioning_question_variable)
+              | list
+              | length == 0
+            }}
+
     # -------------------------------------------------------
     # Merge and POST
     # -------------------------------------------------------
@@ -378,8 +458,10 @@
             | rejectattr('variable', 'equalto', datastore_question_variable)
             | rejectattr('variable', 'equalto', cluster_question_variable)
             | rejectattr('variable', 'equalto', resource_pool_question_variable)
+            | rejectattr('variable', 'equalto', timezone_question_variable)
+            | rejectattr('variable', 'equalto', disk_provisioning_question_variable)
             | list
-            + [ova_base_url_question, ova_question, profile_question, datastore_question, cluster_question, resource_pool_question]
+            + [ova_base_url_question, ova_question, profile_question, datastore_question, cluster_question, resource_pool_question, timezone_question, disk_provisioning_question]
           }}
 
     - name: POST merged survey spec back to AAP

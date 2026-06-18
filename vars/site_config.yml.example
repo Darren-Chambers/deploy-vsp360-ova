@@ -1,0 +1,42 @@
+# =======================================================
+# Site Configuration — vars/site_config.yml.example
+# =======================================================
+# This file is a template for vars/site_config.yml
+# which contains site-specific configuration for
+# the VSP360 deployment project.
+#
+# This file IS committed to version control as it
+# contains only placeholder values.
+#
+# To get started:
+#   cp vars/site_config.yml.example vars/site_config.yml
+#   Edit vars/site_config.yml with your site values
+# =======================================================
+
+# -------------------------------------------------------
+# AAP
+# Used by: update_aap_survey.yml
+# -------------------------------------------------------
+aap_host: "https://your-aap-host"
+
+# -------------------------------------------------------
+# OVA file server
+# Used by: update_aap_survey.yml, deploy_vsp360.yml
+# -------------------------------------------------------
+ova_server_url: "http://your-ova-server"
+
+# -------------------------------------------------------
+# VSP360 deployment defaults
+# Used by: update_aap_survey.yml (survey defaults)
+# -------------------------------------------------------
+vsp360_default_ip: "0.0.0.0"
+
+# -------------------------------------------------------
+# VSP360 network constants
+# Used by: deploy_vsp360.yml
+# -------------------------------------------------------
+vsp360_netmask: "255.255.255.0"
+vsp360_gateway: "0.0.0.0"
+vsp360_dns: "0.0.0.0"
+vsp360_domain: "your.domain"
+vsp360_ntp: "your.ntp.server"

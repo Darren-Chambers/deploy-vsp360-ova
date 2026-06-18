@@ -1,0 +1,31 @@
+# =======================================================
+# Vault — ansible_vault_vars/ansible_vault.yml
+# =======================================================
+# Contains all secrets for the VSP360 deployment project.
+#
+# To encrypt after filling in values:
+#   ansible-vault encrypt ansible_vault_vars/ansible_vault.yml
+#
+# To edit an encrypted vault:
+#   ansible-vault edit ansible_vault_vars/ansible_vault.yml
+#
+# To decrypt:
+#   ansible-vault decrypt ansible_vault_vars/ansible_vault.yml
+# =======================================================
+
+# -------------------------------------------------------
+# AAP credentials
+# -------------------------------------------------------
+aap_user: "your-aap-username"
+aap_pass: "your-aap-password"
+
+# -------------------------------------------------------
+# vCenter credentials
+# -------------------------------------------------------
+vcenter_username: "your-username"
+vcenter_password: "your-password"
+
+# -------------------------------------------------------
+# VSP360 credentials
+# -------------------------------------------------------
+vsp360_root_password: "your-password"
