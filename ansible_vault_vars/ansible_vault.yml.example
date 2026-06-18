@@ -28,4 +28,4 @@ vcenter_password: "your-vcenter-password"
 # -------------------------------------------------------
 # VSP360 credentials
 # -------------------------------------------------------
-vsp360_root_password: "your-vsp360-root-password"
+vsp360_root_password: "ChangeMe.vsp360"
