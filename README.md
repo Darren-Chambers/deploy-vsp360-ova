@@ -19,7 +19,8 @@ and resource pools each evening via a scheduled job.
     ├── vars/
     │   └── site_config.yml.example    # Copy to site_config.yml and populate
     └── images/
-        └── Ansible_VSP360_Deploy.png  # AAP job template creation screenshot
+        ├── Ansible_VSP360_Deploy.png          # Deploy job template screenshot
+        └── Ansible_VSP360_Refresh_Survey.png  # Refresh survey job template screenshot
 
 ---
 
@@ -212,6 +213,8 @@ Create a second job template with the following settings:
 | Playbook | update_aap_survey.yml |
 | Credentials | Your Vault Credential |
 | Inventory | localhost |
+
+![Refresh VSP360 Survey Job Template creation screen](images/Ansible_VSP360_Refresh_Survey.png)
 
 Add the following Extra Variable, replacing <template_id> with the
 ID noted from Step 1:
