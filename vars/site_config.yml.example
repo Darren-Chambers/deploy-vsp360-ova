@@ -20,6 +20,13 @@
 aap_host: "https://your-aap-host"
 
 # -------------------------------------------------------
+# vCenter site constants
+# Used by: update_aap_survey.yml, deploy_vsp360.yml
+# -------------------------------------------------------
+vcenter_hostname: "your-vcenter-host"
+vcenter_datacenter: "your-datacenter"
+
+# -------------------------------------------------------
 # OVA file server
 # Used by: update_aap_survey.yml, deploy_vsp360.yml
 # -------------------------------------------------------
