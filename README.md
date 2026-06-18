@@ -182,7 +182,7 @@ Create a job template in AAP with the following settings:
 
 | Setting | Value |
 |---|---|
-| Name | Deploy VSP360 |
+| Name | Ansible VSP360 Deploy |
 | Playbook | deploy_vsp360.yml |
 | Credentials | Your Vault Credential |
 | Inventory | localhost |
