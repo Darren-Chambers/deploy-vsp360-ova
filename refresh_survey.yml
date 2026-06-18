@@ -18,6 +18,7 @@
     datastore_question_variable: "datastore_name"
     cluster_question_variable: "cluster_name"
     resource_pool_question_variable: "resource_pool"
+    network_question_variable: "vsp360_network"
     timezone_question_variable: "vsp360_timezone"
     disk_provisioning_question_variable: "disk_provisioning"
 
@@ -49,7 +50,7 @@
             variable: "vsp360_hostname"
             type: "text"
             required: true
-            default: "vsp360-small"
+            default: "vsp360-large"
             min: 0
             max: 1024
             choices: []
@@ -201,6 +202,37 @@
       ansible.builtin.fail:
         msg: "No resource pools found in vCenter."
       when: resource_pool_names | length == 0
+
+    # -------------------------------------------------------
+    # vCenter — Networks
+    # -------------------------------------------------------
+
+    - name: Fetch networks from vCenter
+      community.vmware.vmware_portgroup_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        cluster_name: "{{ cluster_names | first }}"
+      delegate_to: localhost
+      register: network_info
+
+    - name: Parse network names
+      ansible.builtin.set_fact:
+        network_names: >-
+          {{
+            network_info.hosts_portgroup_info.values()
+            | flatten
+            | map(attribute='portgroup')
+            | unique
+            | sort
+            | list
+          }}
+
+    - name: Fail early if no networks found
+      ansible.builtin.fail:
+        msg: "No networks found in vCenter datacenter {{ vcenter_datacenter }}."
+      when: network_names | length == 0
 
     # -------------------------------------------------------
     # Fetch existing AAP survey
@@ -380,6 +412,26 @@
               | length == 0
             }}
 
+    - name: Build network question
+      ansible.builtin.set_fact:
+        network_question:
+          question_name: "VM Network"
+          question_description: "Select the target vCenter network"
+          variable: "{{ network_question_variable }}"
+          type: "multiplechoice"
+          choices: "{{ network_names }}"
+          required: true
+          default: "{{ existing_defaults[network_question_variable] | default(network_names | first) }}"
+          min: 0
+          max: 1024
+          new_question: >-
+            {{
+              existing_survey_spec
+              | selectattr('variable', 'equalto', network_question_variable)
+              | list
+              | length == 0
+            }}
+
     - name: Build timezone question
       ansible.builtin.set_fact:
         timezone_question:
@@ -458,10 +510,11 @@
             | rejectattr('variable', 'equalto', datastore_question_variable)
             | rejectattr('variable', 'equalto', cluster_question_variable)
             | rejectattr('variable', 'equalto', resource_pool_question_variable)
+            | rejectattr('variable', 'equalto', network_question_variable)
             | rejectattr('variable', 'equalto', timezone_question_variable)
             | rejectattr('variable', 'equalto', disk_provisioning_question_variable)
             | list
-            + [ova_base_url_question, ova_question, profile_question, datastore_question, cluster_question, resource_pool_question, timezone_question, disk_provisioning_question]
+            + [ova_base_url_question, ova_question, profile_question, datastore_question, cluster_question, resource_pool_question, network_question, timezone_question, disk_provisioning_question]
           }}
 
     - name: POST merged survey spec back to AAP
