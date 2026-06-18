@@ -43,7 +43,7 @@ following settings:
 |---|---|
 | Name | Ansible VSP360 Deployment (or any name of your choice) |
 | Source Control Type | Git |
-| Source Control URL | <your git repository URL> |
+| Source Control URL | https://github.com/Darren-Chambers/deploy-vsp360-ova |
 
 AAP will automatically clone the repository when the project is saved
 and on every subsequent sync.
