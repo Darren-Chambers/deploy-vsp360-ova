@@ -1,11 +1,32 @@
+# VSP360 AAP Deployment Project
+
+Automates the deployment of VSP360 OVA to VMware vCenter using Red Hat
+Ansible Automation Platform (AAP). Includes a dynamic survey that
+automatically refreshes available OVA files, VMware datastores, clusters,
+and resource pools each evening via a scheduled job.
+
+---
+
+## Project Structure
+
+    deploy_vsp360/
+    ├── .gitignore
+    ├── README.md
+    ├── deploy_vsp360.yml              # Deploys VSP360 OVA to vCenter
+    ├── update_aap_survey.yml          # Refreshes AAP survey with live data
+    ├── ansible_vault_vars/
+    │   └── ansible_vault.yml.example  # Copy to ansible_vault.yml and populate
+    └── vars/
+        └── site_config.yml.example    # Copy to site_config.yml and populate
+
 ---
 
 ## Prerequisites
 
 - Red Hat Ansible Automation Platform 2.5+
 - VMware vCenter access
-- `community.vmware` collection available in your AAP execution environment
-- Nginx web server hosting OVA files with `autoindex_format json` enabled
+- community.vmware collection available in your AAP execution environment
+- Nginx web server hosting OVA files with autoindex_format json enabled
 - Git repository connected to AAP as a project
 
 ---
@@ -14,66 +35,57 @@
 
 ### 1. Clone the repository
 
-```bash
-git clone <your-repo-url>
-cd deploy_vsp360
-```
+    git clone <your-repo-url>
+    cd deploy_vsp360
 
 ### 2. Create site configuration
 
-```bash
-cp vars/site_config.yml.example vars/site_config.yml
-```
+Copy the example file to create your local site configuration:
 
-Edit `vars/site_config.yml` with your environment values. This file is
-excluded from Git via `.gitignore` and must be created on every new clone.
+    cp vars/site_config.yml.example vars/site_config.yml
+
+Edit vars/site_config.yml with your environment values. This file is
+excluded from Git via .gitignore and must never be committed to version
+control as it contains environment-specific values.
 
 ### 3. Create the vault file
 
-```bash
-cp ansible_vault_vars/ansible_vault.yml.example ansible_vault_vars/ansible_vault.yml
-```
+Copy the example file to create your local vault:
 
-Edit `ansible_vault_vars/ansible_vault.yml` with your credentials, then encrypt it:
+    cp ansible_vault_vars/ansible_vault.yml.example ansible_vault_vars/ansible_vault.yml
 
-```bash
-ansible-vault encrypt ansible_vault_vars/ansible_vault.yml
-```
+Edit ansible_vault_vars/ansible_vault.yml with your credentials, then
+encrypt it:
 
-Store the vault password in AAP as a **Vault Credential** — it will be
-used automatically when jobs run.
+    ansible-vault encrypt ansible_vault_vars/ansible_vault.yml
+
+Store the vault password in AAP as a Vault Credential — it will be
+used automatically when jobs run. The encrypted vault file must not
+be committed to version control.
 
 ### 4. Configure Nginx autoindex
 
 On your OVA file server, ensure Nginx is configured with JSON autoindex:
 
-```nginx
-location / {
-    root /var/www/html;
-    autoindex on;
-    autoindex_format json;
-}
-```
+    location / {
+        root /var/www/html;
+        autoindex on;
+        autoindex_format json;
+    }
 
 Reload Nginx after changes:
 
-```bash
-nginx -t && systemctl reload nginx
-```
+    nginx -t && systemctl reload nginx
 
 Verify it is working:
 
-```bash
-curl http://<your-ova-server>/
-```
+    curl http://<your-ova-server>/
 
 Expected output:
 
-```json
-[
-  { "name": "VSP360-x.x.x.ova", "type": "file", "mtime": "...", "size": 0 }
-]
-```
+    [
+      { "name": "VSP360-x.x.x.ova", "type": "file", "mtime": "...", "size": 0 }
+    ]
 
 ---
 
@@ -85,17 +97,19 @@ Create a job template in AAP with the following settings:
 
 | Setting | Value |
 |---|---|
-| Name | `Deploy VSP360` |
-| Playbook | `deploy_vsp360.yml` |
+| Name | Deploy VSP360 |
+| Playbook | deploy_vsp360.yml |
 | Credentials | Your Vault Credential |
-| Inventory | `localhost` |
+| Inventory | localhost |
 | Survey | Enabled (populated by the refresh job) |
 
-> **Note the Job Template ID from the URL once created — you will need it
-> in Step 2.**
->
-> Navigate to the template and check the URL:
-> `https://<aap-host>/#/templates/job_template/`**`58`**`/details`
+Note the Job Template ID from the URL once created — you will need it
+in Step 2.
+
+Navigate to the template and check the URL:
+https://<aap-host>/#/templates/job_template/58/details
+                                              ^^
+                                        that is your ID
 
 ---
 
@@ -105,31 +119,29 @@ Create a second job template with the following settings:
 
 | Setting | Value |
 |---|---|
-| Name | `Refresh VSP360 Survey` |
-| Playbook | `update_aap_survey.yml` |
+| Name | Refresh VSP360 Survey |
+| Playbook | update_aap_survey.yml |
 | Credentials | Your Vault Credential |
-| Inventory | `localhost` |
+| Inventory | localhost |
 
-Add the following **Extra Variable**, replacing `<template_id>` with the
+Add the following Extra Variable, replacing <template_id> with the
 ID noted from Step 1:
 
-```yaml
-aap_job_template_id: <template_id>
-```
+    aap_job_template_id: <template_id>
 
-> This tells the refresh job which template's survey to update. It must
-> be set before the job will run successfully.
+This tells the refresh job which template survey to update. It must
+be set before the job will run successfully.
 
 ---
 
 ### Step 3 — Run the Survey Refresh Job
 
-Run the `Refresh VSP360 Survey` job template manually for the first time.
+Run the Refresh VSP360 Survey job template manually for the first time.
 This will:
 
 - Connect to Nginx and discover available OVA files
 - Connect to vCenter and discover datastores, clusters, and resource pools
-- Create the survey on the `Deploy VSP360` template if it does not exist
+- Create the survey on the Deploy VSP360 template if it does not exist
 - Populate all dropdown choices with live data
 - Preserve any existing defaults
 
@@ -137,21 +149,21 @@ This will:
 
 ### Step 4 — Schedule the Survey Refresh Job
 
-Add a schedule to the `Refresh VSP360 Survey` job template to keep the
+Add a schedule to the Refresh VSP360 Survey job template to keep the
 survey choices up to date automatically:
 
 | Setting | Value |
 |---|---|
-| Name | `Nightly Survey Refresh` |
+| Name | Nightly Survey Refresh |
 | Start date/time | Today at 18:00 |
 | Repeat frequency | Every day |
-| RRULE | `RRULE:FREQ=DAILY;BYHOUR=18;BYMINUTE=0;BYSECOND=0` |
+| RRULE | RRULE:FREQ=DAILY;BYHOUR=18;BYMINUTE=0;BYSECOND=0 |
 
 ---
 
 ### Step 5 — Deploy VSP360
 
-Launch the `Deploy VSP360` job template. The survey will prompt for:
+Launch the Deploy VSP360 job template. The survey will prompt for:
 
 | Question | Description |
 |---|---|
@@ -182,36 +194,41 @@ Launch the `Deploy VSP360` job template. The survey will prompt for:
 
 ### vars/site_config.yml
 
+Copied from vars/site_config.yml.example — not committed to Git.
+
 | Variable | Used By | Description |
 |---|---|---|
-| `aap_host` | update_aap_survey.yml | AAP server URL |
-| `vcenter_hostname` | both | vCenter server IP or hostname |
-| `vcenter_datacenter` | both | vCenter datacenter name |
-| `ova_server_url` | both | Nginx OVA file server base URL |
-| `vsp360_default_ip` | update_aap_survey.yml | Default IP shown in survey |
-| `vsp360_netmask` | deploy_vsp360.yml | VM network mask |
-| `vsp360_gateway` | deploy_vsp360.yml | VM default gateway |
-| `vsp360_dns` | deploy_vsp360.yml | VM DNS server |
-| `vsp360_domain` | deploy_vsp360.yml | VM domain name |
-| `vsp360_ntp` | deploy_vsp360.yml | VM NTP server |
+| aap_host | update_aap_survey.yml | AAP server URL |
+| vcenter_hostname | both | vCenter server IP or hostname |
+| vcenter_datacenter | both | vCenter datacenter name |
+| ova_server_url | both | Nginx OVA file server base URL |
+| vsp360_default_ip | update_aap_survey.yml | Default IP shown in survey |
+| vsp360_netmask | deploy_vsp360.yml | VM network mask |
+| vsp360_gateway | deploy_vsp360.yml | VM default gateway |
+| vsp360_dns | deploy_vsp360.yml | VM DNS server |
+| vsp360_domain | deploy_vsp360.yml | VM domain name |
+| vsp360_ntp | deploy_vsp360.yml | VM NTP server |
 
 ### ansible_vault_vars/ansible_vault.yml
 
+Copied from ansible_vault_vars/ansible_vault.yml.example — not committed to Git.
+
 | Variable | Description |
 |---|---|
-| `aap_user` | AAP admin username |
-| `aap_pass` | AAP admin password |
-| `vcenter_username` | vCenter username |
-| `vcenter_password` | vCenter password |
-| `vsp360_root_password` | VSP360 appliance root password |
+| aap_user | AAP admin username |
+| aap_pass | AAP admin password |
+| vcenter_username | vCenter username |
+| vcenter_password | vCenter password |
+| vsp360_root_password | VSP360 appliance root password |
 
 ---
 
 ## Notes
 
-- `vars/site_config.yml` and `ansible_vault_vars/ansible_vault.yml` are
-  excluded from Git via `.gitignore`. They must be created manually on
-  every new clone or managed via AAP Extra Variables.
+- Both vars/site_config.yml and ansible_vault_vars/ansible_vault.yml
+  must be created by copying their respective .example files and
+  populating them with your values before running any jobs.
+- Neither file should ever be committed to version control.
 - The survey refresh job safely preserves existing survey defaults and
   all non-dynamic questions on every run.
 - If no survey exists on the deploy template, the refresh job will create
