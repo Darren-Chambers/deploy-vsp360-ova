@@ -20,7 +20,8 @@ and resource pools each evening via a scheduled job.
     │   └── site_config.yml.example    # Copy to site_config.yml and populate
     └── images/
         ├── Ansible_VSP360_Deploy.png          # Deploy job template screenshot
-        └── Ansible_VSP360_Refresh_Survey.png  # Refresh survey job template screenshot
+        ├── Ansible_VSP360_Refresh_Survey.png  # Refresh survey job template screenshot
+        └── Ansible_VSP360_Edit_Survey.png     # Survey defaults edit screenshot
 
 ---
 
@@ -182,7 +183,7 @@ Create a job template in AAP with the following settings:
 
 | Setting | Value |
 |---|---|
-| Name | Ansible VSP360 Deploy |
+| Name | Deploy VSP360 |
 | Playbook | deploy_vsp360.yml |
 | Credentials | Your Vault Credential |
 | Inventory | localhost |
@@ -280,6 +281,8 @@ Typical defaults to consider setting:
 | VM Network | Your primary VM network |
 | Timezone | Your local timezone |
 | Disk Provisioning | thin is recommended for most environments |
+
+![Editing survey defaults in AAP](images/Ansible_VSP360_Edit_Survey.png)
 
 ---
 
