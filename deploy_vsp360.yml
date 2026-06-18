@@ -14,7 +14,7 @@
   vars:
     vm_name: "{{ vsp360_hostname }}"
     network_mapping:
-      "VM Network": "VM Network"
+      "VM Network": "{{ vsp360_network }}"
 
     # Profile sizing map
     profile_config:
