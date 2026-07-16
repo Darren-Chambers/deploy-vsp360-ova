@@ -11,9 +11,9 @@
     # Scenario 1 — OVA still exists
     #simulated_existing_ova_default: "VSP360-1.2.2.1777587352-118.ova"
     # Scenario 2 — OVA has been deleted
-    simulated_existing_ova_default: "VSP360-1.0.0.old.ova"
+    #simulated_existing_ova_default: "VSP360-1.0.0.old.ova"
     # Scenario 3 — no previous default
-    # simulated_existing_ova_default: ""
+    simulated_existing_ova_default: ""
 
   tasks:
 
