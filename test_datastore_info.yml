@@ -6,6 +6,17 @@
   vars_files:
     - "./ansible_vault_vars/ansible_vault.yml"
 
+  vars:
+    # Simulate different scenarios by changing this value
+    # Scenario 1 — exact match from previous run
+    simulated_existing_default: "3DC-JDT (Free: 173.0 GB)"
+    # Scenario 2 — stale free space from previous run
+    # simulated_existing_default: "3DC-JDT (Free: 999.9 GB)"
+    # Scenario 3 — no previous default
+    # simulated_existing_default: ""
+    # Scenario 4 — datastore no longer exists
+    # simulated_existing_default: "DELETED-DS (Free: 1.0 TB)"
+
   tasks:
 
     - name: Check if site vars file exists
@@ -38,6 +49,11 @@
             | list
           }}
 
+    - name: Fail early if no accessible datastores found
+      ansible.builtin.fail:
+        msg: "No accessible datastores found in vCenter datacenter {{ vcenter_datacenter }}."
+      when: accessible_datastores | length == 0
+
     - name: Build datastore names with free space labels
       ansible.builtin.set_fact:
         datastore_names: >-
@@ -59,18 +75,22 @@
       ansible.builtin.debug:
         msg: "{{ datastore_names }}"
 
-    - name: Simulate survey selection
+    - name: Resolve datastore default from existing survey
       ansible.builtin.set_fact:
-        datastore_name: "{{ datastore_names | first }}"
+        resolved_datastore_default: >-
+          {{
+            datastore_names
+            | select('search', '^' + (simulated_existing_default | regex_replace(' \(Free:.*\)$', '')) + ' ')
+            | list
+            | first
+            | default(datastore_names | first)
+          }}
 
-    - name: Strip free space label from survey selection
-      ansible.builtin.set_fact:
-        clean_datastore_name: "{{ datastore_name | regex_replace(' \\(Free:.*\\)$', '') }}"
-
-    - name: DEBUG | Show before and after strip
+    - name: "DEBUG | Show default resolution results"
       ansible.builtin.debug:
         msg:
-          - "======== DATASTORE STRIP TEST ========"
-          - "Survey value  : {{ datastore_name }}"
-          - "Stripped value: {{ clean_datastore_name }}"
-          - "Match         : {{ clean_datastore_name == (accessible_datastores | first).name }}"
+          - "======== DATASTORE DEFAULT RESOLUTION ========"
+          - "Simulated existing default : {{ simulated_existing_default }}"
+          - "Stripped name              : {{ simulated_existing_default | regex_replace(' \\(Free:.*\\)$', '') }}"
+          - "Resolved new default       : {{ resolved_datastore_default }}"
+          - "Resolution method          : {{ 'matched by name' if simulated_existing_default | regex_replace(' \\(Free:.*\\)$', '') in resolved_datastore_default else 'fell back to first' }}"
