@@ -15,7 +15,6 @@
 # See the License for the specific language governing
 # permissions and limitations under the License.
 # =======================================================
-
 ---
 - name: Update AAP Job Template Survey with dynamic choices
   hosts: localhost
@@ -147,20 +146,37 @@
       delegate_to: localhost
       register: datastore_info
 
-    - name: Parse datastore names
+    - name: Filter accessible datastores only
       ansible.builtin.set_fact:
-        datastore_names: >-
+        accessible_datastores: >-
           {{
             datastore_info.datastores
-            | map(attribute='name')
-            | sort
+            | selectattr('accessible', 'equalto', true)
+            | sort(attribute='name')
             | list
           }}
 
-    - name: Fail early if no datastores found
+    - name: Fail early if no accessible datastores found
       ansible.builtin.fail:
-        msg: "No datastores found in vCenter datacenter {{ vcenter_datacenter }}."
-      when: datastore_names | length == 0
+        msg: "No accessible datastores found in vCenter datacenter {{ vcenter_datacenter }}."
+      when: accessible_datastores | length == 0
+
+    - name: Build datastore names with free space labels
+      ansible.builtin.set_fact:
+        datastore_names: >-
+          {{
+            datastore_names | default([])
+            + [
+                item.name + ' (Free: ' +
+                (
+                  (item.freeSpace / 1099511627776) | round(1) | string + ' TB'
+                  if item.freeSpace >= 1099511627776
+                  else (item.freeSpace / 1073741824) | round(1) | string + ' GB'
+                ) +
+                ')'
+              ]
+          }}
+      loop: "{{ accessible_datastores }}"
 
     # -------------------------------------------------------
     # vCenter — Clusters
@@ -374,12 +390,19 @@
       ansible.builtin.set_fact:
         datastore_question:
           question_name: "Datastore"
-          question_description: "Select the target datastore"
+          question_description: "Select the target datastore — free space shown at time of last survey refresh"
           variable: "{{ datastore_question_variable }}"
           type: "multiplechoice"
           choices: "{{ datastore_names }}"
           required: true
-          default: "{{ existing_defaults[datastore_question_variable] | default(datastore_names | first) }}"
+          default: >-
+            {{
+              datastore_names
+              | select('search', '^' + (existing_defaults[datastore_question_variable] | default('') | regex_replace(' \(Free:.*\)$', '')) + ' ')
+              | list
+              | first
+              | default(datastore_names | first)
+            }}
           min: 0
           max: 1024
           new_question: >-

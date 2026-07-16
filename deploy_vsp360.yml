@@ -15,7 +15,6 @@
 # See the License for the specific language governing
 # permissions and limitations under the License.
 # =======================================================
-
 ---
 ##################################################
 # Deploy VSP360 OVA to VMware vCenter
@@ -76,6 +75,10 @@
         msg: "Invalid profile '{{ vsp360_profile }}'. Must be one of: small, medium, large."
       when: vsp360_profile not in ['small', 'medium', 'large']
 
+    - name: Strip free space label from datastore survey selection
+      ansible.builtin.set_fact:
+        clean_datastore_name: "{{ datastore_name | regex_replace(' \\(Free:.*\\)$', '') }}"
+
     - name: Deploy OVF/OVA to vSphere
       community.vmware.vmware_deploy_ovf:
         allow_duplicates: false
@@ -85,7 +88,7 @@
         validate_certs: false
         datacenter: "{{ vcenter_datacenter }}"
         cluster: "{{ cluster_name }}"
-        datastore: "{{ datastore_name }}"
+        datastore: "{{ clean_datastore_name }}"
         disk_provisioning: "{{ disk_provisioning }}"
         resource_pool: "{{ resource_pool }}"
         name: "{{ vm_name }}"
