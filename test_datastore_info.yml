@@ -11,9 +11,9 @@
     # Scenario 1 — exact match from previous run
     #simulated_existing_default: "3DC-JDT (Free: 173.0 GB)"
     # Scenario 2 — stale free space from previous run
-     simulated_existing_default: "3DC-JDT (Free: 999.9 GB)"
+    # simulated_existing_default: "3DC-JDT (Free: 999.9 GB)"
     # Scenario 3 — no previous default
-    # simulated_existing_default: ""
+     simulated_existing_default: ""
     # Scenario 4 — datastore no longer exists
     # simulated_existing_default: "DELETED-DS (Free: 1.0 TB)"
 
