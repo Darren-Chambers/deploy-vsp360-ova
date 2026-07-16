@@ -103,10 +103,10 @@
       when: aap_job_template_id == "NONE"
 
     # -------------------------------------------------------
-    # OVA files from Nginx
+    # OVA files from web server
     # -------------------------------------------------------
 
-    - name: Fetch OVA file list from Nginx
+    - name: Fetch OVA file list from web server
       ansible.builtin.uri:
         url: "{{ ova_server_url }}/"
         method: GET
@@ -115,7 +115,7 @@
           Accept: "application/json"
       register: nginx_index
 
-    - name: Parse OVA filenames from Nginx index
+    - name: Parse OVA filenames from index
       ansible.builtin.set_fact:
         ova_filenames: >-
           {{
@@ -352,7 +352,14 @@
           type: "multiplechoice"
           choices: "{{ ova_filenames }}"
           required: false
-          default: "{{ existing_defaults[ova_question_variable] | default(ova_filenames | first) }}"
+          default: >-
+            {{
+              ova_filenames
+              | select('equalto', existing_defaults[ova_question_variable] | default(''))
+              | list
+              | first
+              | default(ova_filenames | first)
+            }}
           min: 0
           max: 1024
           new_question: >-
