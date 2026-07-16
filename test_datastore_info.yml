@@ -1,0 +1,77 @@
+---
+- name: Test OVA default resolution
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "./ansible_vault_vars/ansible_vault.yml"
+
+  vars:
+    # Uncomment one scenario at a time
+    # Scenario 1 — OVA still exists
+    simulated_existing_ova_default: "VSP360-1.2.2.1777587352-118.ova"
+    # Scenario 2 — OVA has been deleted
+    # simulated_existing_ova_default: "VSP360-1.0.0.old.ova"
+    # Scenario 3 — no previous default
+    # simulated_existing_ova_default: ""
+
+  tasks:
+
+    - name: Check if site vars file exists
+      ansible.builtin.stat:
+        path: "./vars/site_config.yml"
+      register: site_config_stat
+
+    - name: Include site vars file if present
+      ansible.builtin.include_vars:
+        file: "./vars/site_config.yml"
+      when: site_config_stat.stat.exists
+
+    - name: Fetch OVA file list from web server
+      ansible.builtin.uri:
+        url: "{{ ova_server_url }}/"
+        method: GET
+        return_content: true
+        headers:
+          Accept: "application/json"
+      register: nginx_index
+
+    - name: Parse OVA filenames
+      ansible.builtin.set_fact:
+        ova_filenames: >-
+          {{
+            nginx_index.json
+            | selectattr('type', 'equalto', 'file')
+            | selectattr('name', 'match', '.+\.ova$')
+            | map(attribute='name')
+            | map('trim')
+            | list
+          }}
+
+    - name: Fail early if no OVA files found
+      ansible.builtin.fail:
+        msg: "No OVA files found at {{ ova_server_url }}"
+      when: ova_filenames | length == 0
+
+    - name: DEBUG | Show available OVA files
+      ansible.builtin.debug:
+        msg: "{{ ova_filenames }}"
+
+    - name: Resolve OVA default
+      ansible.builtin.set_fact:
+        resolved_ova_default: >-
+          {{
+            ova_filenames
+            | select('equalto', simulated_existing_ova_default)
+            | list
+            | first
+            | default(ova_filenames | first)
+          }}
+
+    - name: "DEBUG | Show OVA default resolution results"
+      ansible.builtin.debug:
+        msg:
+          - "======== OVA DEFAULT RESOLUTION ========"
+          - "Simulated existing default : {{ simulated_existing_ova_default }}"
+          - "Resolved new default       : {{ resolved_ova_default }}"
+          - "Resolution method          : {{ 'matched' if simulated_existing_ova_default == resolved_ova_default else 'fell back to first' }}"
