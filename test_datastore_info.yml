@@ -28,6 +28,33 @@
       delegate_to: localhost
       register: datastore_info
 
-    - name: DEBUG | Show first datastore attributes
+    - name: Filter accessible datastores only
+      ansible.builtin.set_fact:
+        accessible_datastores: >-
+          {{
+            datastore_info.datastores
+            | selectattr('accessible', 'equalto', true)
+            | sort(attribute='name')
+            | list
+          }}
+
+    - name: Build datastore names with free space labels
+      ansible.builtin.set_fact:
+        datastore_names: >-
+          {{
+            datastore_names | default([])
+            + [
+                item.name + ' (Free: ' +
+                (
+                  (item.freeSpace / 1099511627776) | round(1) | string + ' TB'
+                  if item.freeSpace >= 1099511627776
+                  else (item.freeSpace / 1073741824) | round(1) | string + ' GB'
+                ) +
+                ')'
+              ]
+          }}
+      loop: "{{ accessible_datastores }}"
+
+    - name: DEBUG | Show formatted datastore choices
       ansible.builtin.debug:
-        var: datastore_info.datastores | first
+        msg: "{{ datastore_names }}"
