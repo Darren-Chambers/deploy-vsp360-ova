@@ -71,6 +71,6 @@
       ansible.builtin.debug:
         msg:
           - "======== DATASTORE STRIP TEST ========"
-          - "Survey value : {{ datastore_name }}"
+          - "Survey value  : {{ datastore_name }}"
           - "Stripped value: {{ clean_datastore_name }}"
-          -
+          - "Match         : {{ clean_datastore_name == (accessible_datastores | first).name }}"
