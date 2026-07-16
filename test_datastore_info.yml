@@ -58,3 +58,19 @@
     - name: DEBUG | Show formatted datastore choices
       ansible.builtin.debug:
         msg: "{{ datastore_names }}"
+
+    - name: Simulate survey selection
+      ansible.builtin.set_fact:
+        datastore_name: "{{ datastore_names | first }}"
+
+    - name: Strip free space label from survey selection
+      ansible.builtin.set_fact:
+        clean_datastore_name: "{{ datastore_name | regex_replace(' \\(Free:.*\\)$', '') }}"
+
+    - name: DEBUG | Show before and after strip
+      ansible.builtin.debug:
+        msg:
+          - "======== DATASTORE STRIP TEST ========"
+          - "Survey value : {{ datastore_name }}"
+          - "Stripped value: {{ clean_datastore_name }}"
+          -
