@@ -1,0 +1,33 @@
+---
+- name: Test datastore info attributes
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "./ansible_vault_vars/ansible_vault.yml"
+
+  tasks:
+
+    - name: Check if site vars file exists
+      ansible.builtin.stat:
+        path: "./vars/site_config.yml"
+      register: site_config_stat
+
+    - name: Include site vars file if present
+      ansible.builtin.include_vars:
+        file: "./vars/site_config.yml"
+      when: site_config_stat.stat.exists
+
+    - name: Fetch datastores from vCenter
+      community.vmware.vmware_datastore_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        datacenter: "{{ vcenter_datacenter }}"
+      delegate_to: localhost
+      register: datastore_info
+
+    - name: DEBUG | Show first datastore attributes
+      ansible.builtin.debug:
+        var: datastore_info.datastores | first
